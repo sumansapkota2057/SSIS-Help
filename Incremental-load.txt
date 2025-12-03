@@ -1,0 +1,14 @@
+INSERT INTO fact_sales (
+ sale_id, product_id, customer_id, qty, Price, Total_amt, sale_date, LoadedDateTime
+)
+SELECT 
+    sale_id, 
+    product_id, 
+    customer_id, 
+    qty, 
+    dbo.USDToNPR(Price) AS Price, 
+    qty * dbo.USDToNPR(Price) AS Total_amt, 
+    sale_date, 
+    LoadedDateTime
+FROM stg_sales
+WHERE sale_date > ?;
