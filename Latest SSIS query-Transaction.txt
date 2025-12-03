@@ -1,0 +1,464 @@
+Create database Project;
+
+use  Project;
+
+
+select * from fact_sales;
+
+
+CREATE TABLE dim_customer (
+  customer_sk INT IDENTITY(1,1) PRIMARY KEY,
+  customer_id INT ,
+  first_name VARCHAR(100),
+  last_name VARCHAR(100),
+  email VARCHAR(255),
+  city VARCHAR(100),
+  total_amt_spent BIGINT,
+  is_active BIT,
+  start_date DATETIME,
+  end_date DATETIME NULL,
+  LastUpdatedDateTime DATETIME2
+);
+
+
+
+
+ 
+CREATE TABLE dim_product (
+  product_sk INT IDENTITY(1,1) PRIMARY KEY,
+  product_id INT ,
+  name VARCHAR(255),
+  category VARCHAR(100),
+  price INT,	
+  total_qty_sold BIGINT,
+  is_active BIT,
+  start_date DATETIME,
+  end_date DATETIME NULL,
+  LastUpdatedDateTime DATETIME2
+);
+ 
+CREATE TABLE fact_sales (
+  product_sk INT IDENTITY(1,1) PRIMARY KEY,
+  sale_id BIGINT ,
+  product_id INT,
+  customer_id INT,
+  qty INT,
+  Price INT,
+  Total_amt BIGINT,
+  sale_date DATE,
+  LoadedDateTime DATETIME2
+);
+
+select *  from fact_sales;
+ 
+------------------------------------------------------------------
+CREATE TABLE stg_customers (
+  customer_id INT,
+  first_name VARCHAR(100),
+  last_name VARCHAR(100),
+  email VARCHAR(255),
+  city VARCHAR(100),	
+  updated_at DATETIME2,
+  loaded_file_name VARCHAR(255),
+  LoadedDateTime DATETIME2 
+);
+
+
+ 
+CREATE TABLE stg_products (
+  product_id INT ,
+  name VARCHAR(255),
+  category VARCHAR(100),
+  price INT,	
+  Updatedat DATETIME2,
+  load_file_name VARCHAR(255),
+  LoadedDateTime DATETIME2 
+);
+ 
+CREATE TABLE stg_sales (
+  sale_id BIGINT,
+  product_id INT,
+  customer_id INT,
+  qty INT,
+  Price INT,
+  Total_amt BIGINT,
+  sale_date DATE,
+  load_file_name VARCHAR(255),
+  LoadedDateTime DATETIME2 
+);
+
+
+select * from stg_products;
+
+select * from stg_sales;
+
+select * from fact_sales;
+
+truncate table dim_customer;
+truncate table dim_product;
+truncate table fact_sales;
+
+select * from dim_customer;
+select * from dim_product;
+
+ 
+CREATE TABLE inventory_daily (	
+  inventory_date DATE,
+  product_id INT,
+  boh INT,  -- beginning on hand
+  eoh INT  -- ending on hand
+);
+ 
+CREATE TABLE etl_audit (
+  audit_id INT IDENTITY(1,1) PRIMARY KEY,
+  package_name NVARCHAR(200),
+  run_start DATETIME,
+  run_end DATETIME,
+  status VARCHAR(50),
+  error_message VARCHAR(MAX)
+);
+
+
+select * from inventory_daily;
+
+select * from dim_product;
+
+truncate table inventory_daily;
+
+INSERT INTO etl_audit
+(package_name, run_start, run_end, status, error_message)
+VALUES
+('SSIS_Project', '2025-11-18', '2025-11-18', 'Success', null);
+ 
+
+
+
+ SELECT * FROM etl_audit;
+ truncate table etl_audit;
+
+ --last run date
+SELECT MAX(run_end) FROM etl_audit
+where package_name='SSIS_Project' and status='success';
+ 
+ --Incremental load
+INSERT INTO fact_sales (sale_id, product_id, customer_id, qty, Price, Total_amt, sale_date, LoadedDateTime)
+SELECT (s.sale_id, s.product_id, s.customer_id, s.qty, s.Price, s.Total_amt, s.sale_date, s.LoadedDateTime)
+FROM stg_sales s
+WHERE s.sale_date > ?;
+
+INSERT INTO fact_sales (
+ sale_id, product_id, customer_id, qty, Price, Total_amt, sale_date, LoadedDateTime
+)
+SELECT 
+    sale_id, 
+    product_id, 
+    customer_id, 
+    qty, 
+    dbo.USDToNPR(Price) AS Price, 
+    qty * dbo.USDToNPR(Price) AS Total_amt, 
+    sale_date, 
+    LoadedDateTime
+FROM stg_sales
+WHERE sale_date > '2025-11-18';
+
+select * from stg_sales;
+
+select * from 
+
+select * from stg_sales;
+select * from fact_sales;
+select * from etl_audit;
+
+
+CREATE FUNCTION USDToNPR
+(
+    @USDAmount DECIMAL(18, 4)
+)
+RETURNS DECIMAL(18, 4)
+AS
+BEGIN
+    DECLARE @Rate DECIMAL(18, 4) = 133.00;  
+    RETURN @USDAmount * @Rate;
+END;
+
+GO
+ 
+
+
+
+--  insert into  dim_prod from stg_product
+CREATE OR ALTER PROCEDURE insert_dim_product
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    BEGIN TRAN;
+
+    BEGIN TRY
+
+        MERGE dim_product tgt
+        USING (
+            SELECT product_id, name, category, price, Updatedat, LoadedDateTime
+            FROM stg_products
+        ) src
+        ON (tgt.product_id = src.product_id AND tgt.is_active = 1)
+
+        WHEN MATCHED AND 
+            (tgt.name <> src.name 
+             OR tgt.category <> src.category 
+             OR tgt.price <> src.price)
+        THEN 
+            UPDATE SET 
+                tgt.is_active = 0,
+                tgt.end_date = GETDATE(),
+                tgt.LastUpdatedDateTime = GETDATE()
+
+        WHEN NOT MATCHED BY TARGET
+        THEN
+            INSERT (
+                product_id, name, category, price, is_active, 
+                start_date, end_date, LastUpdatedDateTime
+            )
+            VALUES (
+                src.product_id, src.name, src.category, src.price,
+                1, src.Updatedat, NULL, GETDATE()
+            )
+
+        WHEN NOT MATCHED BY SOURCE
+        THEN
+            UPDATE SET 
+                tgt.is_active = 0,
+                tgt.end_date = GETDATE(),
+                tgt.LastUpdatedDateTime = GETDATE();
+
+        INSERT INTO DIM_PRODUCT 
+        (product_id, name, category, price, is_active, start_date, end_date, LastUpdatedDateTime)
+        SELECT 
+            s.product_id,
+            s.name,
+            s.category,
+            s.price,
+            1,
+            s.updatedat,
+            NULL,
+            GETDATE()
+        FROM stg_products AS s
+        LEFT JOIN dim_product AS t
+            ON s.product_id = t.product_id
+               AND s.name = t.name
+               AND s.category = t.category
+               AND s.price = t.price
+               AND t.is_active = 1
+        WHERE t.product_id IS NULL;
+
+        COMMIT TRAN;
+
+    END TRY
+
+    BEGIN CATCH
+        ROLLBACK TRAN;
+        THROW;
+    END CATCH
+END;
+
+
+go
+
+
+
+CREATE OR ALTER PROCEDURE insert_dim_customer
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    BEGIN TRAN;
+
+    BEGIN TRY
+
+        MERGE dim_customer AS d
+        USING stg_customers AS s
+            ON d.customer_id = s.customer_id
+           AND d.is_active = 1
+
+        WHEN MATCHED AND 
+            (
+                d.first_name <> s.first_name
+                OR d.last_name <> s.last_name
+                OR d.email <> s.email
+                OR d.city <> s.city
+            )
+        THEN
+            UPDATE SET
+                d.is_active = 0,
+                d.end_date = GETDATE(),
+                d.LastUpdatedDateTime = GETDATE()
+
+        WHEN NOT MATCHED BY TARGET
+        THEN
+            INSERT (
+                customer_id,
+                first_name,
+                last_name,
+                email,
+                city,
+                total_amt_spent,
+                is_active,
+                start_date,
+                end_date,
+                LastUpdatedDateTime
+            )
+            VALUES (
+                s.customer_id,
+                s.first_name,
+                s.last_name,
+                s.email,
+                s.city,
+                NULL,
+                1,
+                GETDATE(),
+                NULL,
+                GETDATE()
+            )
+
+        WHEN NOT MATCHED BY SOURCE
+        THEN
+            UPDATE SET
+                d.is_active = 0,
+                d.end_date = GETDATE(),
+                d.LastUpdatedDateTime = GETDATE();
+
+        INSERT INTO dbo.dim_customer (
+            customer_id,
+            first_name,
+            last_name,
+            email,
+            city,
+            total_amt_spent,
+            is_active,
+            start_date,
+            end_date,
+            LastUpdatedDateTime
+        )
+        SELECT 
+            stg.customer_id,
+            stg.first_name,
+            stg.last_name,
+            stg.email,
+            stg.city,
+            NULL,
+            1,
+            GETDATE(),
+            NULL,
+            GETDATE()
+        FROM dbo.stg_customers stg
+        LEFT JOIN dbo.dim_customer d
+            ON d.customer_id = stg.customer_id
+           AND d.first_name = stg.first_name
+           AND d.last_name = stg.last_name
+           AND d.email = stg.email
+           AND d.city = stg.city
+           AND d.is_active = 1
+        WHERE d.customer_id IS NULL;
+
+        COMMIT TRAN;
+
+    END TRY
+    BEGIN CATCH
+        ROLLBACK TRAN;
+        THROW;
+    END CATCH
+END;
+
+
+
+
+
+
+-----Inventory table
+
+CREATE OR ALTER PROCEDURE LOAD_INVENTORY
+    @LastRunDate DATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    BEGIN TRAN;
+
+    BEGIN TRY
+
+        WITH sold_qty AS (
+            SELECT 
+                p.product_id, 
+                sale_date, 
+                SUM(qty) AS total_qantity_sold
+            FROM dim_product AS p
+            LEFT JOIN stg_sales AS s
+                ON p.product_id = s.product_id 
+            WHERE sale_date > @LastRunDate 
+              AND is_active = 1
+            GROUP BY p.product_id, sale_date
+        ),
+        boh_data AS (
+            SELECT 
+                ISNULL(a.sale_date, DATEADD(day, +1, b.inventory_date)) AS sale_date, 
+                a.product_id,
+                ISNULL(b.eoh, 100) AS latest_boh, 
+                ISNULL(a.total_qantity_sold, 0) AS total_qantity_sold
+            FROM sold_qty a
+            LEFT JOIN inventory_daily b
+                ON a.product_id = b.product_id 
+               AND b.inventory_date = DATEADD(day, -1, a.sale_date)
+        ),
+        final_cte AS (
+            SELECT 
+                sale_date AS inventory_date, 
+                product_id, 
+                latest_boh AS boh, 
+                latest_boh - total_qantity_sold AS eoh
+            FROM boh_data
+        )
+
+        INSERT INTO inventory_daily
+        SELECT * FROM final_cte;
+
+        COMMIT TRAN;
+
+    END TRY
+    BEGIN CATCH
+        ROLLBACK TRAN;
+        THROW;
+    END CATCH
+END;
+
+
+
+delete from etl_audit
+where audit_id <> 8;
+
+
+
+select * from stg_products;
+select * from stg_sales;
+select * from stg_customers;
+select * from etl_audit;
+select * from fact_sales;
+select * from inventory_daily;
+select * from dim_product;
+select * from dim_product;
+
+
+
+update etl_audit 
+set run_end = '2025-11-18'
+where audit_id = 8;
+
+
+
+
+
+
+
+
+
+
+
