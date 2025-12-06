@@ -1,0 +1,153 @@
+Slide 11 – Testing & Validation: Ensuring Data Quality
+
+Bullets:
+
+File ingestion test
+
+SCD2 logic validation
+
+Incremental sales validation
+
+Currency conversion checks
+
+Daily inventory verification
+
+Logging & error handling verification
+
+Your goal
+
+Show that you didn’t just build – you validated.
+
+What to say
+
+“I performed testing at different levels:
+• File ingestion: I verified that customer, product, and sales CSV files with different dates and names are correctly picked up through the Foreach Loops and loaded into staging.
+• SCD2 logic: I tested scenarios where attributes change, ensuring old rows are end‑dated and new rows are created with correct StartDate, EndDate, and IsActive values.
+• Incremental sales: I ran the ETL multiple times with overlapping sales data to confirm that FactSales only receives new rows and duplicates are prevented.
+• Currency conversion: I cross‑checked sample rows to ensure USD amounts were correctly converted to NPR using the defined rate.
+• Inventory: I manually recalculated BOH and EOH for a few products and compared them with InventoryDaily.
+• Logging: I tested both success and failure paths to ensure etl_audit captures status and error messages correctly.”
+
+If they ask “How would you automate tests later?”:
+
+“In the next phase we can add stored procedures or scripts to compare row counts, validate business rules, and even send alerts if certain thresholds fail.”
+
+Slide 12 – Challenges Faced: Overcoming Obstacles
+
+Bullets include:
+
+Dynamic File Paths
+
+MERGE Conflicts
+
+CSV Format Inconsistencies
+
+SCD2 Row Duplication
+
+Inventory Logic complexity
+
+Your goal
+
+Show ownership and learning. Don’t blame; explain how you fixed.
+
+What to say
+
+“During development I faced several challenges:
+• Managing dynamic file paths for different environments. I solved this by using project parameters and SSIS expressions, so the same package can run with different folder paths.
+• MERGE conflicts in SCD2 procedures – initially I had issues with multiple matches and incorrect end‑dating. I refined the join conditions and removed duplicates in staging before merging.
+• CSV inconsistencies – some files had minor format issues. I added data type checks and treated problematic rows carefully, logging them for review.
+• SCD2 row duplication – I adjusted logic to ensure that for a given customer_id or product_id and point in time, only one active row exists.
+• Inventory logic – ensuring correct BOH/EOH when there were gaps in sales dates. I used previous available EOH and ensured the procedure handles days with no sales.”
+
+Always end with “what you learned” from each challenge.
+
+Slide 13 – Learnings & Improvements: Evolving the Process
+
+Bullets:
+
+Enhanced SCD Type‑2 mastery
+
+Use of SSIS Event Handlers
+
+Optimized table design
+
+Next steps: validation rules and email alerts
+
+Your goal
+
+Show growth mindset and future roadmap.
+
+What to say
+
+“From this project I gained:
+• A deeper understanding of SCD Type 2, both conceptually and practically, including how to handle changes, deletes, and duplicates.
+• Experience with SSIS Event Handlers to centralize error handling and logging into etl_audit.
+• Insights into table design – such as indexing FactSales, using surrogate keys in dimensions, and choosing appropriate data types.
+
+For future improvements:
+• I’d like to add more data validation rules, such as value range checks and referential integrity checks before loading into facts.
+• I’d also integrate automated email alerts that notify stakeholders if the ETL fails or if certain thresholds (like zero sales) occur.”
+
+Managers will like this because it shows you think beyond “it runs on my machine”.
+
+Slide 14 – Conclusion: A Fully Automated ETL Pipeline
+
+Bullets:
+
+End‑to‑end automation
+
+Historical tracking for customer and product
+
+Incremental fact loading
+
+Daily inventory
+
+Integrated audit logging
+
+Your goal
+
+End with clear impact.
+
+What to say
+
+“To summarize:
+• We now have an end‑to‑end automated ETL pipeline that loads daily customer, product, and sales data from configurable folders.
+• The system maintains full historical tracking for customers and products using SCD Type 2, enabling better trend and performance analysis.
+• FactSales is loaded incrementally, preventing duplicates and reducing load time.
+• The InventoryDaily table provides daily BOH and EOH per product for operational and analytical reporting.
+• And finally, integrated audit logging in etl_audit gives full traceability of each ETL run, including start time, end time, status, and error messages.
+
+This aligns with all major requirements defined in the BRD and prepares the data warehouse for downstream BI and analytics.”
+
+Then finish with:
+
+“Thank you. I’m happy to take any questions.”
+
+Quick Defense Tips (for Q&A)
+
+If they ask “Where in the BRD is this requirement?”
+– Refer to sections:
+
+Historical tracking & SCD2: BRD sections 3.2, 4.1, 4.2. 
+
+BRD_ETL_Sales_Customer_Product_…
+
+Incremental sales load & USD→NPR: sections 3.3, 4.3. 
+
+BRD_ETL_Sales_Customer_Product_…
+
+Inventory logic: section 3.4, 4.4. 
+
+BRD_ETL_Sales_Customer_Product_…
+
+Logging & error handling: section 3.6, 4.5. 
+
+BRD_ETL_Sales_Customer_Product_…
+
+If they ask “What would you improve next?”
+– Mention: more validation, automated alerts, performance tuning (indexes, partitioning if data grows), and more granular error categories.
+
+If they ask “Why SSIS instead of X?”
+– Answer:
+
+“SSIS integrates tightly with SQL Server, supports robust control and data flows, and is well‑suited for file‑based ETL like this project. It also supports variables, parameters, event handlers, and can be deployed and scheduled easily in SQL Server environments.”
