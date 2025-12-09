@@ -1,0 +1,265 @@
+
+CREATE TABLE Employeecpy AS
+SELECT * FROM HR.EMPLOYEES;
+
+
+CREATE TABLE Departmentcpy as
+SELECT * FROM HR.DEPARTMENTS
+WHERE 1=1;
+
+
+
+--QNo1) List the names of employees who earn more than the average salary of their department.  
+
+SELECT e.employee_id,e.first_name,e.last_name,e.salary,e.department_id
+FROM EMPLOYEECPY e
+WHERE e.salary > (SELECT AVG(e2.salary) FROM EMPLOYEECPY e2 WHERE e2.DEPARTMENT_ID = e.DEPARTMENT_ID);
+
+--Correlated Subquery
+-- Find employees who earn the highest salary in their department.
+
+SELECT employee_id,e.first_name,e.last_name,e.salary,e.department_id,d.department_name
+FROM EMPLOYEECPY e
+WHERE  e.salary = (SELECT MAX(salary) FROM EMPLOYEECPY WHERE department_id = e.DEPARTMENT_ID  );
+
+
+--Self JOIN + Aggregation: Find the number of subordinates each manager has.  
+--Use a self join on employees table. 
+--Group by manager_id and count subordinates. 
+
+
+SELECT e.manager_id,COUNT(e.employee_id) as subordinates_count
+FROM EMPLOYEECPY e
+JOIN EMPLOYEECPY m ON e.MANAGER_ID = m.EMPLOYEE_ID
+GROUP BY e.MANAGER_ID
+ORDER BY COUNT(e.EMPLOYEE_ID) DESC;
+
+
+
+--MERGE Operation with Log Table: 
+ --You are given a table employee_updates with updated salary and job_id for some employees. Create a MERGE statement to update the employees table accordingly. Also, insert a record into employee_log table for each update with employee_id, old_salary, new_salary, update_date.  
+--Use MERGE to update employee. 
+--Use OUTPUT clause to insert into employee_log 
+
+select * from DEPARTMENTCPY;
+select * from EMPLOYEECPY;
+
+
+CREATE  TABLE employee_updates (
+    employee_id number,
+    updated_salary NUMBER,
+    job_id VARCHAR(100)
+);
+
+CREATE TABLE EMPLOYEES(
+    employee_id NUMBER PRIMARY KEY,
+    first_name VARCHAR2(50),
+    last_name VARCHAR2(50),
+    job_id VARCHAR2(20),
+    salary NUMBER,
+    manager_id NUMBER
+);
+
+
+
+INSERT INTO EMPLOYEES(employee_id, first_name, last_name, job_id, salary, manager_id) VALUES
+(101, 'Alex', 'Smith', 'DEV1', 50000, 500),
+(102, 'Sam', 'Brown', 'DEV1', 52000, 500),
+(103, 'Rita', 'Sharma', 'QA1', 48000, 600),
+(104, 'John', 'Khan', 'HR1', 45000, 600),
+(105, 'Kim', 'Lopez', 'DEV2', 58000, 500),
+(500, 'Manager', 'A', 'MGR1', 90000, 900),
+(600, 'Manager', 'B', 'MGR2', 95000, 900),
+(900, 'Director', 'X', 'DIR1', 120000, NULL);
+
+INSERT INTO EMPLOYEES(employee_id, first_name, last_name, job_id, salary, manager_id) VALUES
+(201, 'Alex', 'Smith', 'DEV1', 50000, 500),
+(202, 'Sam', 'Brown', 'DEV1', 52000, 500),
+(203, 'Rita', 'Sharma', 'QA1', 48000, 600),
+(204, 'John', 'Khan', 'HR1', 45000, 600),
+(205, 'Kim', 'Lopez', 'DEV2', 58000, 500);
+
+
+INSERT INTO employee_updates (employee_id, updated_salary, job_id) VALUES
+(101, 55000, 'DEV1'),   
+(102, 53000, 'DEV1'),   
+(103, 60000, 'QA1'),    
+(105, 65000, 'DEV2');  
+
+
+select * from employees;
+
+
+
+CREATE TABLE employee_log (
+    log_id NUMBER PRIMARY KEY,
+    employee_id NUMBER,
+    old_salary NUMBER(10,2),
+    new_salary NUMBER(10,2),
+    updated_date DATE
+);
+
+
+MERGE INTO employees e USING employee_updates eu
+ON (e.employee_id = eu.employee_id)
+WHEN MATCHED THEN 
+ UPDATE SET e.salary = eu.updated_salary,
+         e.job_id = eu.job_id;
+
+
+--Find duplicate records and delete them: (Ensure your deletion logic is safe and does not remove all
+ --records from a group.) 
+--Write a query to find all sets of duplicate employees based on first_name, last_name, email and 
+--hire_Date (In case there are no duplicates, make sure to insert some duplicate entries.) 
+--Show the duplicate groups with a count of how many times each appears.  
+--Include the employee_id values for each duplicate.
+
+select * from EMPLOYEECPY;
+
+INSERT INTO EMPLOYEECPY ( EMPLOYEE_ID, FIRST_NAME,LAST_NAME,EMAIL, PHONE_NUMBER,HIRE_DATE,
+    JOB_ID,SALARY,COMMISSION_PCT,MANAGER_ID,DEPARTMENT_ID)
+     VALUES (301, 'Jennifer','Whalen','JWHALEN','1.515.555.0165',
+     TO_DATE('9/17/2013, 12:00:00 AM', 'MM/DD/YYYY HH:MI:SS AM'),
+    'AD_ASST',4400, NULL,101,10
+);
+
+INSERT INTO EMPLOYEECPY ( EMPLOYEE_ID, FIRST_NAME,LAST_NAME,EMAIL, PHONE_NUMBER,HIRE_DATE,
+    JOB_ID,SALARY,COMMISSION_PCT,MANAGER_ID,DEPARTMENT_ID)
+     VALUES (300, 'Douglas','Grant','DGRANT','1.650.555.0164',
+     TO_DATE('01/13/2018 12:00:00 AM', 'MM/DD/YYYY HH:MI:SS AM'),
+    'SH_CLERK',2600, NULL,124,50
+);
+
+INSERT INTO EMPLOYEECPY ( EMPLOYEE_ID, FIRST_NAME,LAST_NAME,EMAIL, PHONE_NUMBER,HIRE_DATE,
+    JOB_ID,SALARY,COMMISSION_PCT,MANAGER_ID,DEPARTMENT_ID)
+     VALUES (302, 'Michael','Martinez','MMARTINE','1.515.555.0166',
+     TO_DATE('2/17/2014, 12:00:00 AM', 'MM/DD/YYYY HH:MI:SS AM'),
+    'MK_MAN',13000, NULL,100,20
+);
+
+-- to find duplicate rows 
+WITH DUP_CTE AS (
+    SELECT employee_id, first_name,last_name,email,hire_Date, 
+ ROW_NUMBER () OVER (PARTITION BY first_name,last_name,email,hire_date ORDER BY employee_id ) as rnk
+    FROM EMPLOYEECPY
+)
+SELECT * FROM DUP_CTE 
+WHERE rnk > 1;
+
+--delete duplicate rows
+
+DELETE FROM employeecpy
+WHERE employee_id IN (
+    SELECT employee_id
+    FROM (
+        SELECT  employee_id,
+            ROW_NUMBER() OVER (PARTITION BY first_name, last_name, email, hire_date
+                ORDER BY employee_id
+            ) AS rnk
+        FROM employeecpy
+    )
+    WHERE rnk > 1
+);
+
+---You are tasked with identifying top-performing employees from departments that not only have 
+--above-average salaries but also more than 5 employees. Use two CTEs to structure your logic 
+--and join them to get the final result. 
+
+
+WITH dept_stats AS (
+    SELECT  e.department_id, avg(e.salary)as avg_depart ,COUNT(*) as total_employee
+    FROM EMPLOYEECPY e
+    GROUP BY department_id
+    HAVING avg(e.salary) > (Select avg(salary)FROM EMPLOYEECPY) AND
+    count(*) > 5
+),
+top_earners AS (
+    SELECT e.employee_id,e.first_name || ' ' || e.last_name as full_name ,e.salary,e.department_id
+    FROM EMPLOYEECPY e
+    WHERE e.salary  = (SELECT MAX(salary) FROM EMPLOYEECPY
+                        WHERE department_id = e.DEPARTMENT_ID)
+)
+SELECT de.department_name,t.employee_id, t.full_name,t.salary,d.avg_depart,d.total_employee
+FROM dept_stats d
+JOIN top_earners t ON d.department_id = t.department_id
+JOIN DEPARTMENTCPY de ON d.department_id = de.department_id
+ORDER BY de.department_name, t.salary DESC;
+
+
+
+---Create a PL/SQL procedure named update_bonus that updates employee bonus information  
+--based on the hr.employees table. ( emp_bonus_log with columns emp_id, emp_name, salary, bonus, updated_date.) 
+--Use a MERGE statement to: 
+---Update emp_bonus_log if the employee already exists. 
+--Insert a new record if not. 
+--display meaningful messages using DBMS_OUTPUT 
+--and handle no_data_found exception if the employee ID doesn’t exist.  
+
+select * from EMPLOYEECPY;
+
+CREATE TABLE emp_bonus_log(
+    emp_id NUMBER,
+    emp_name VARCHAR2(50),
+    salary DECIMAL(10,2),
+    bonus DECIMAL,
+    updated_date DATE
+);
+
+
+
+CREATE OR REPLACE PROCEDURE update_bonus
+ (p_emp_id IN Employeecpy.employee_id%TYPE)
+AS
+
+v_emp EMPLOYEECPY%ROWTYPE
+
+BEGIN   
+
+    SELECT * INTO v_emp
+    FROM EMPLOYEECPY
+    WHERE employeecpy.employee_id = p_emp_id
+
+    MERGE INTO emp_bonus_log  eb 
+    USING (SELECT v_emp.employee_id as emp_id,
+           v_emp.first_name || ' ' || v_emp.last_name as emp_name
+           v_emp.salary as emp_salary
+           v_emp.salary * 0.10 as bonus
+           WHERE employee_id = p_emp_id
+    ) e
+    ON (eb.emp_id = e.employee_id)
+
+    WHEN MATCHED THEN
+     UPDATE SET 
+        eb.emp_name = e.emp_name
+        eb.salary = e.emp_salary
+        eb.bonus = e.bonus
+        eb.updated_date = sysdate;
+    
+    WHEN NOT MATCHED THEN
+     INSERT (emp_id,emp_name,salary,bonus,updated_date)
+     VALUES (e.employee_id,e.emp_name ,e.salary,e.bonus,sysdate);
+
+ DBMS_OUTPUT.PUT_LINE('Bonus updated for Employee ID: ' || v_emp.employee_id);
+
+
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        DBMS_OUTPUT.PUT_LINE('No employee found with ID: ' || p_emp_id);
+
+
+BEGIN
+    update_bonus(101);
+END;
+        
+
+
+
+
+
+
+
+
+
+
+ 
+
